@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import socket
 import sys
+import json
 from pathlib import Path
+
 
 def recv_line(sock):
     data = b""
@@ -10,21 +12,24 @@ def recv_line(sock):
         if not ch:
             return None
         data += ch
-        if data.endswith(b"\r\n"):
-            return data[:-2].decode("utf-8")
+        if data.endswith(b"\n"):
+            return data.decode().strip()
 
 
-def recv_multiline_until(sock, end_prefix):
-    """Receive multiple FTP lines until a line starting with specific prefix arrives."""
+def recv_multiline(sock):
+    """Receives lines until server sends END."""
     lines = []
     while True:
         line = recv_line(sock)
         if line is None:
             break
+
+        if line == "END":
+            break
+
         print(line)
         lines.append(line)
-        if line.startswith(end_prefix):
-            break
+
     return lines
 
 
@@ -32,22 +37,28 @@ def interactive(host="127.0.0.1", port=2121):
     sock = socket.create_connection((host, port))
     print(recv_line(sock))  # banner
 
-    def send_line(line):
-        sock.sendall((line + "\r\n").encode("utf-8"))
-        resp = recv_line(sock)
-        return resp
+    # --------------- AUTH -----------------
+    username = input("Username: ")
+    password = input("Password: ")
 
-    # ------------------
-    # LOGIN
-    # ------------------
-    username = input("USER: ")
-    print(send_line(f"USER {username}"))
-    password = input("PASS: ")
-    print(send_line(f"PASS {password}"))
+    sock.sendall(f"AUTH {username} {password}\n".encode())
 
-    # ------------------
-    # COMMAND LOOP
-    # ------------------
+    auth_response = recv_line(sock)
+    print(auth_response)
+
+    try:
+        auth_data = json.loads(auth_response)
+    except:
+        print("Invalid authentication response from server.")
+        return
+
+    if auth_data.get("status") != "success":
+        print("Login failed.")
+        return
+
+    print("Login OK. Permissions:", auth_data["permissions"])
+
+    # --------------- COMMAND LOOP -----------------
     while True:
         cmd = input("ftp> ").strip()
         if not cmd:
@@ -56,37 +67,32 @@ def interactive(host="127.0.0.1", port=2121):
         parts = cmd.split()
         verb = parts[0].upper()
 
-        # ----------------------------------------------------
-        # LIST command (FIXED — SHOW ALL AT ONCE)
-        # ----------------------------------------------------
+        # -------- LIST --------
         if verb == "LIST":
-            sock.sendall(b"LIST\r\n")
-
-            # read until 226 Done
-            recv_multiline_until(sock, "226")
+            sock.sendall(b"LIST\n")
+            recv_multiline(sock)
             continue
 
-        # ----------------------------------------------------
-        # STOR upload
-        # ----------------------------------------------------
-        elif verb == "STOR":
+        # -------- UPLOAD --------
+        elif verb == "UPLOAD":
             if len(parts) != 2:
-                print("Usage: STOR <local_path>")
+                print("Usage: UPLOAD <local_path>")
                 continue
 
             local = Path(parts[1])
-            if not local.exists() or not local.is_file():
-                print("Local file not found")
+            if not local.exists():
+                print("File not found")
                 continue
 
             size = local.stat().st_size
-            remote_name = local.name
+            name = local.name
 
-            sock.sendall((f"STOR {remote_name} {size}\r\n").encode("utf-8"))
+            sock.sendall(f"UPLOAD {name} {size}\n".encode())
+
             resp = recv_line(sock)
             print(resp)
 
-            if not resp.startswith("150"):
+            if not resp.startswith("OK"):
                 continue
 
             with open(local, "rb") as f:
@@ -96,62 +102,60 @@ def interactive(host="127.0.0.1", port=2121):
                         break
                     sock.sendall(chunk)
 
-            # read final status
-            recv_multiline_until(sock, "226")
+            print(recv_line(sock))
             continue
 
-        # ----------------------------------------------------
-        # RETR download
-        # ----------------------------------------------------
-        elif verb == "RETR":
+        # -------- DOWNLOAD --------
+        elif verb == "DOWNLOAD":
             if len(parts) != 2:
-                print("Usage: RETR <remote_filename>")
+                print("Usage: DOWNLOAD <remote_file>")
                 continue
 
             remote = parts[1]
-            sock.sendall((f"RETR {remote}\r\n").encode("utf-8"))
+            sock.sendall(f"DOWNLOAD {remote}\n".encode())
 
             resp = recv_line(sock)
             print(resp)
-            if not resp.startswith("150"):
+
+            if not resp.startswith("OK"):
                 continue
 
-            try:
-                _, size_s = resp.split(None, 1)
-                size = int(size_s.strip())
-            except:
-                print("Invalid size from server")
-                continue
+            _, size_s = resp.split()
+            size = int(size_s)
 
             data = b""
-            remaining = size
-            while remaining > 0:
-                chunk = sock.recv(min(8192, remaining))
+            remain = size
+            while remain > 0:
+                chunk = sock.recv(8192)
                 if not chunk:
-                    print("Connection lost during file transfer")
+                    print("Connection lost")
                     return
                 data += chunk
-                remaining -= len(chunk)
+                remain -= len(chunk)
 
-            # read "226 Transfer complete"
             finish = recv_line(sock)
             print(finish)
 
-            # save file locally
-            localname = Path(remote).name
-            with open(localname, "wb") as f:
+            with open(remote, "wb") as f:
                 f.write(data)
 
-            print(f"Saved as {localname}")
+            print(f"Saved: {remote}")
             continue
 
-        # ----------------------------------------------------
-        # Generic single-response commands
-        # ----------------------------------------------------
+        # -------- DELETE --------
+        elif verb == "DELETE":
+            if len(parts) != 2:
+                print("Usage: DELETE <file>")
+                continue
+
+            sock.sendall(f"DELETE {parts[1]}\n".encode())
+            print(recv_line(sock))
+            continue
+
+        # -------- RAW COMMANDS (PWD, CWD, QUIT) --------
         else:
-            sock.sendall((cmd + "\r\n").encode("utf-8"))
-            resp = recv_line(sock)
-            print(resp)
+            sock.sendall((cmd + "\n").encode())
+            print(recv_line(sock))
             continue
 
 
