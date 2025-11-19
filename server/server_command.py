@@ -40,8 +40,7 @@ class FTPCommands:
             return
 
         home = Path(self.users_db[self.user]["home_dir"]).resolve()
-        if not home.exists():
-            home.mkdir(parents=True, exist_ok=True)
+        home.mkdir(parents=True, exist_ok=True)
 
         self.cwd = home
         self.send("230 Login successful")
@@ -66,29 +65,24 @@ class FTPCommands:
             return
 
         home = Path(self.users_db[self.user]["home_dir"]).resolve()
-
-        if self.cwd == home:
-            rel = "/"
-        else:
-            rel = "/" + str(self.cwd.relative_to(home)).replace("\\", "/")
-
+        rel = "/" if self.cwd == home else "/" + str(self.cwd.relative_to(home)).replace("\\", "/")
         self.send(f'257 "{rel}"')
 
     # -----------------------------
     # CWD
     # -----------------------------
     def cmd_CWD(self, directory):
-        if not self.require_auth(): 
+        if not self.require_auth():
             return
 
-        if directory in ["", None]:
+        if not directory:
             self.send("501 Syntax: CWD <directory>")
             return
 
         new_dir = (self.cwd / directory).resolve()
+        home = Path(self.users_db[self.user]["home_dir"]).resolve()
 
         # prevent escaping home folder
-        home = Path(self.users_db[self.user]["home_dir"]).resolve()
         if home not in new_dir.parents and new_dir != home:
             self.send("550 Access denied")
             return
@@ -104,32 +98,33 @@ class FTPCommands:
     # LIST
     # -----------------------------
     def cmd_LIST(self):
-        if not self.require_auth(): 
+        if not self.require_auth():
             return
+
         if not self.has_perm("read"):
             self.send("550 Permission denied")
             return
 
-        self.send("150 Here comes directory listing")
+        self.send("150 Listing directory:")
 
         try:
             items = os.listdir(self.cwd)
-        except Exception:
-            self.send("550 Failed to list directory")
+        except:
+            self.send("550 Could not list directory")
             return
 
         if not items:
             self.send("(empty)")
         else:
             for name in items:
-                full_path = self.cwd / name
-                if full_path.is_dir():
-                    self.send(f"DIR 0 {name}")
+                full = self.cwd / name
+                if full.is_dir():
+                    self.send(f"[DIR] {name}")
                 else:
-                    size = full_path.stat().st_size
-                    self.send(f"FILE {size} {name}")
+                    size = full.stat().st_size
+                    self.send(f"{size} bytes  {name}")
 
-        self.send("226 Directory send OK")
+        self.send("226 Done.")
 
     # -----------------------------
     # RETR (download)
@@ -143,7 +138,7 @@ class FTPCommands:
 
         file_path = (self.cwd / filename).resolve()
         if not file_path.exists():
-            self.send("550 File does not exist")
+            self.send("550 File not found")
             return
 
         self.send(f"150 Opening data connection for {filename}")
@@ -161,7 +156,6 @@ class FTPCommands:
             return
 
         file_path = (self.cwd / filename).resolve()
-
         self.send("150 Ready to receive file")
         receive_file(self.conn, file_path)
         self.send("226 Upload complete")
@@ -189,4 +183,7 @@ class FTPCommands:
     # -----------------------------
     def cmd_QUIT(self):
         self.send("221 Goodbye")
-        self.conn.close()
+        try:
+            self.conn.close()
+        except:
+            pass
