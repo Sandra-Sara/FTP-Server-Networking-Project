@@ -98,7 +98,10 @@ def get_lock_for_path(path: str):
 def secure_join(base: Path, *parts):
     """Prevent directory traversal: ensure the result stays inside base."""
     p = base.joinpath(*parts).resolve()
-    if not str(p).startswith(str(base.resolve())):
+    # Make sure base has trailing separator when comparing on Windows too
+    base_res = str(base.resolve())
+    p_str = str(p)
+    if not p_str.startswith(base_res):
         raise ValueError("Forbidden path")
     return p
 
@@ -150,6 +153,7 @@ class FTPHandler(StreamRequestHandler):
                 else:
                     self.send("502 Command not implemented.")
             except Exception as e:
+                # never leak internal types, but send message
                 self.send(f"550 {str(e)}")
 
     def send(self, msg):
@@ -202,6 +206,9 @@ class FTPHandler(StreamRequestHandler):
         self.cwd = self.home
         Path(self.home).mkdir(parents=True, exist_ok=True)
 
+        # helpful debug in server console (optional)
+        # print(f"[DEBUG] User '{self.user}' home: {self.home}")
+
         self.send("230 Logged in.")
 
     def cmd_PWD(self):
@@ -218,8 +225,15 @@ class FTPHandler(StreamRequestHandler):
             self.send("501 Syntax: CWD <dir>")
             return
 
+        target = args[0]
+        # allow 'cwd /' to return to home
+        if target == "/" or target == "\\":
+            self.cwd = self.home
+            self.send("250 Directory changed.")
+            return
+
         try:
-            newpath = secure_join(self.home, args[0])
+            newpath = secure_join(self.home, target)
         except:
             self.send("550 Invalid path.")
             return
@@ -233,22 +247,32 @@ class FTPHandler(StreamRequestHandler):
 
     def cmd_LIST(self):
         self.require_auth()
-        if not self.permissions["read"]:
+        if not self.permissions.get("read", False):
             self.send("550 Permission denied.")
             return
 
         self.send("150 Listing directory:")
 
-        for item in sorted(self.cwd.iterdir(), key=lambda p: p.name):
-            size = item.stat().st_size
-            t = "DIR " if item.is_dir() else "FILE"
-            self.send(f"{t} {size} {item.name}")
+        try:
+            items = sorted(self.cwd.iterdir(), key=lambda p: p.name)
+        except Exception:
+            self.send("550 Failed to list directory.")
+            return
+
+        if not items:
+            self.send("(empty)")
+        else:
+            for item in items:
+                size = item.stat().st_size if item.is_file() else 0
+                t = "DIR" if item.is_dir() else "FILE"
+                # clearer, consistent formatting
+                self.send(f"{t} {size} {item.name}")
 
         self.send("226 Done.")
 
     def cmd_RETR(self, args):
         self.require_auth()
-        if not self.permissions["read"]:
+        if not self.permissions.get("read", False):
             self.send("550 Permission denied.")
             return
 
@@ -256,8 +280,9 @@ class FTPHandler(StreamRequestHandler):
             self.send("501 Syntax: RETR <file>")
             return
 
+        # use cwd as base for file retrieval
         try:
-            path = secure_join(self.home, self.cwd.relative_to(self.home), args[0])
+            path = secure_join(self.cwd, args[0])
         except:
             self.send("550 Invalid path.")
             return
@@ -270,7 +295,6 @@ class FTPHandler(StreamRequestHandler):
         with lock:
             size = path.stat().st_size
             self.send(f"150 {size}")
-
             with open(path, "rb") as f:
                 while True:
                     chunk = f.read(8192)
@@ -278,12 +302,13 @@ class FTPHandler(StreamRequestHandler):
                         break
                     self.wfile.write(chunk)
 
+            # follow with an empty line and final code
             self.send("")
             self.send("226 Transfer complete.")
 
     def cmd_STOR(self, args):
         self.require_auth()
-        if not self.permissions["write"]:
+        if not self.permissions.get("write", False):
             self.send("550 Permission denied.")
             return
 
@@ -299,7 +324,7 @@ class FTPHandler(StreamRequestHandler):
             return
 
         try:
-            path = secure_join(self.home, self.cwd.relative_to(self.home), fname)
+            path = secure_join(self.cwd, fname)
         except:
             self.send("550 Invalid path.")
             return
@@ -320,6 +345,11 @@ class FTPHandler(StreamRequestHandler):
                     remain -= len(chunk)
 
             if remain != 0:
+                # incomplete transfer: remove partial file
+                try:
+                    path.unlink(missing_ok=True)
+                except Exception:
+                    pass
                 self.send("426 Transfer aborted.")
                 return
 
@@ -327,7 +357,7 @@ class FTPHandler(StreamRequestHandler):
 
     def cmd_DELE(self, args):
         self.require_auth()
-        if not self.permissions["delete"]:
+        if not self.permissions.get("delete", False):
             self.send("550 Permission denied.")
             return
 
@@ -336,7 +366,7 @@ class FTPHandler(StreamRequestHandler):
             return
 
         try:
-            path = secure_join(self.home, self.cwd.relative_to(self.home), args[0])
+            path = secure_join(self.cwd, args[0])
         except:
             self.send("550 Invalid path.")
             return
