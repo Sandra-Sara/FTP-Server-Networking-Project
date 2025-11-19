@@ -98,7 +98,6 @@ def get_lock_for_path(path: str):
 def secure_join(base: Path, *parts):
     """Prevent directory traversal: ensure the result stays inside base."""
     p = base.joinpath(*parts).resolve()
-    # Make sure base has trailing separator when comparing on Windows too
     base_res = str(base.resolve())
     p_str = str(p)
     if not p_str.startswith(base_res):
@@ -153,7 +152,6 @@ class FTPHandler(StreamRequestHandler):
                 else:
                     self.send("502 Command not implemented.")
             except Exception as e:
-                # never leak internal types, but send message
                 self.send(f"550 {str(e)}")
 
     def send(self, msg):
@@ -206,10 +204,9 @@ class FTPHandler(StreamRequestHandler):
         self.cwd = self.home
         Path(self.home).mkdir(parents=True, exist_ok=True)
 
-        # helpful debug in server console (optional)
-        # print(f"[DEBUG] User '{self.user}' home: {self.home}")
-
+        # Updated part: send permissions for GUI
         self.send("230 Logged in.")
+        self.send(f"PERMS read={can_read} write={can_write} delete={can_delete}")
 
     def cmd_PWD(self):
         self.require_auth()
@@ -226,7 +223,6 @@ class FTPHandler(StreamRequestHandler):
             return
 
         target = args[0]
-        # allow 'cwd /' to return to home
         if target == "/" or target == "\\":
             self.cwd = self.home
             self.send("250 Directory changed.")
@@ -265,7 +261,6 @@ class FTPHandler(StreamRequestHandler):
             for item in items:
                 size = item.stat().st_size if item.is_file() else 0
                 t = "DIR" if item.is_dir() else "FILE"
-                # clearer, consistent formatting
                 self.send(f"{t} {size} {item.name}")
 
         self.send("226 Done.")
@@ -280,7 +275,6 @@ class FTPHandler(StreamRequestHandler):
             self.send("501 Syntax: RETR <file>")
             return
 
-        # use cwd as base for file retrieval
         try:
             path = secure_join(self.cwd, args[0])
         except:
@@ -302,7 +296,6 @@ class FTPHandler(StreamRequestHandler):
                         break
                     self.wfile.write(chunk)
 
-            # follow with an empty line and final code
             self.send("")
             self.send("226 Transfer complete.")
 
@@ -345,7 +338,6 @@ class FTPHandler(StreamRequestHandler):
                     remain -= len(chunk)
 
             if remain != 0:
-                # incomplete transfer: remove partial file
                 try:
                     path.unlink(missing_ok=True)
                 except Exception:
@@ -401,7 +393,6 @@ def run_server(host="0.0.0.0", port=2121):
         srv.server_close()
 
 
-# Optional helper to create default users
 def create_sample_users():
     home = Path("ftp_homes")
     home.mkdir(exist_ok=True)
