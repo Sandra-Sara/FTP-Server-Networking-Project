@@ -13,63 +13,78 @@ class ConfigWindow(QWidget):
         super().__init__()
 
         self.setWindowTitle("LockBox FTP Server - Configuration")
-        self.setGeometry(300, 100, 800, 600)
+        self.setGeometry(350, 100, 850, 620)
 
-        # ---------------- GLOBAL STYLES ----------------
+        # ---------------- GLOBAL STYLE ----------------
         self.setStyleSheet("""
             QWidget {
-                background-color: #e8f0fe;
+                background-color: #eef3fc;
             }
             QFrame#cardFrame {
                 background-color: white;
-                border-radius: 12px;
+                border-radius: 14px;
                 border: 2px solid #dce3f0;
             }
             QLineEdit {
-                border: 2px solid #d0d7de;
+                border: 2px solid #ccd6e4;
                 border-radius: 6px;
                 padding-left: 10px;
                 background-color: white;
                 font-size: 14px;
             }
             QLineEdit:focus {
-                border: 2px solid #409EFF;
+                border: 2px solid #4b8df9;
             }
             QPushButton {
-                background-color: #409EFF;
+                background-color: #4b8df9;
                 color: white;
                 font-weight: bold;
                 font-size: 16px;
                 border-radius: 8px;
-                padding: 10px 0;
+                padding: 12px 0;
             }
             QPushButton:hover {
-                background-color: #66b1ff;
+                background-color: #76aaff;
             }
         """)
 
         main_layout = QVBoxLayout(self)
         main_layout.setAlignment(Qt.AlignCenter)
 
-        # ---------------- Card Layout ----------------
+        # ---------------- Card Container ----------------
         frame = QFrame()
         frame.setObjectName("cardFrame")
         frame_layout = QVBoxLayout(frame)
-        frame_layout.setContentsMargins(60, 40, 60, 40)
-        frame_layout.setSpacing(20)
+        frame_layout.setContentsMargins(50, 40, 50, 40)
+        frame_layout.setSpacing(22)
 
         # Title
         title = QLabel("🔐 LockBox FTP Server")
         title.setAlignment(Qt.AlignCenter)
-        title.setFont(QFont("Arial", 22, QFont.Bold))
+        title.setFont(QFont("Arial", 24, QFont.Bold))
         frame_layout.addWidget(title)
 
-        subtitle = QLabel("Server Configuration")
+        # Subtitle
+        subtitle = QLabel("Secure • Fast • Encrypted File Transfer")
         subtitle.setAlignment(Qt.AlignCenter)
-        subtitle.setFont(QFont("Arial", 14))
+        subtitle.setFont(QFont("Arial", 12))
+        subtitle.setStyleSheet("color: #444;")
         frame_layout.addWidget(subtitle)
 
-        # Server IP
+        # Intro Section
+        intro = QLabel(
+            "LockBox ensures secure and private file transfers with powerful encryption\n"
+            "and dedicated authentication handled directly by the server.\n\n"
+            "Configure your connection settings below to get started."
+        )
+        intro.setAlignment(Qt.AlignCenter)
+        intro.setFont(QFont("Arial", 10))
+        intro.setStyleSheet("color: #333;")
+        frame_layout.addWidget(intro)
+
+        # -------------- INPUT FIELDS -----------------
+
+        # IP Address
         self.ip_row, self.ip_input = self.create_input_row(
             "🌐 Server IP:", "Enter Server IP (e.g., 127.0.0.1)"
         )
@@ -81,73 +96,55 @@ class ConfigWindow(QWidget):
         )
         frame_layout.addLayout(self.port_row)
 
-        # Username
-        self.username_row, self.username_input = self.create_input_row(
-            "👤 Username:", "Enter Login Username"
-        )
-        frame_layout.addLayout(self.username_row)
-
-        # Password
-        self.pass_row, self.pass_input = self.create_input_row(
-            "🔑 Password:", "Enter Password", True
-        )
-        frame_layout.addLayout(self.pass_row)
-
-        # Save button
-        self.save_button = QPushButton("💾 Save & Continue")
+        # -------------- BUTTON -----------------
+        self.save_button = QPushButton("🚀 Start & Connect")
         self.save_button.clicked.connect(self.save_config)
         frame_layout.addWidget(self.save_button, alignment=Qt.AlignCenter)
 
         main_layout.addWidget(frame, alignment=Qt.AlignCenter)
 
     # -----------------------------------------------------
-    # Create Input Row
-    # -----------------------------------------------------
-    def create_input_row(self, label_text, placeholder, is_password=False):
+    def create_input_row(self, label_text, placeholder):
         layout = QHBoxLayout()
 
         label = QLabel(label_text)
         label.setFont(QFont("Arial", 12, QFont.Bold))
-        label.setFixedWidth(130)
+        label.setFixedWidth(150)
         label.setStyleSheet("color: #2f3640;")
-
         layout.addWidget(label)
 
         input_field = QLineEdit()
         input_field.setPlaceholderText(placeholder)
-        input_field.setFixedHeight(40)
+        input_field.setFixedHeight(42)
         input_field.setMinimumWidth(400)
         input_field.setFont(QFont("Arial", 11))
 
-        if is_password:
-            input_field.setEchoMode(QLineEdit.Password)
-
         layout.addWidget(input_field)
-
         return layout, input_field
 
-    # -----------------------------------------------------
-    # Save Configuration
     # -----------------------------------------------------
     def save_config(self):
         host = self.ip_input.text().strip()
         port = self.port_input.text().strip()
-        username = self.username_input.text().strip()
-        password = self.pass_input.text().strip()
 
-        if not host or not port or not username or not password:
+        # Validate empty
+        if not host or not port:
             QMessageBox.warning(self, "Missing Information",
                                 "Please fill in all fields before continuing.")
             return
 
+        # Validate numeric port
+        if not port.isdigit():
+            QMessageBox.warning(self, "Invalid Port",
+                                "Port must be a number.")
+            return
+
+        port = int(port)
+
         config = {
             "host": host,
-            "port": port,
-            "username": username,
-            "password": password,
+            "port": port
         }
 
-        QMessageBox.information(self, "Saved", "Configuration saved successfully!")
-
-        # Emit to main.py
+        QMessageBox.information(self, "Success", "Configuration saved successfully!")
         self.config_complete.emit(config)
