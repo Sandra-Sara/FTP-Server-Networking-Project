@@ -14,7 +14,7 @@ class LoginWindow(QWidget):
         self.client = client
 
         self.setWindowTitle("LockBox FTP — Login")
-        self.setFixedSize(700, 500)
+        self.setFixedSize(900,700)
         self.setStyleSheet("""
             QWidget {
                 background: qlineargradient(
@@ -40,6 +40,15 @@ class LoginWindow(QWidget):
         title.setStyleSheet("color: #ffffff;")
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
+
+        # ---------------------------------------------------
+        # FTP Server Description
+        # ---------------------------------------------------
+        description = QLabel("Connect securely to your LockBox FTP server to manage files")
+        description.setFont(QFont("Segoe UI", 14))
+        description.setStyleSheet("color: #e0f7fa; font-weight: 500;")
+        description.setAlignment(Qt.AlignCenter)
+        layout.addWidget(description)
 
         subtitle = QLabel("Secure Login Access")
         subtitle.setFont(QFont("Segoe UI", 14))
