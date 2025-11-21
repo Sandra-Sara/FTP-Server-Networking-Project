@@ -24,25 +24,6 @@ download files
 Delete files
 Logout
 
-Project Structure:
-LockBox-FTP/
-│
-├── backend/
-│   ├── client_socket.py       # FTP client socket handler
-│
-├── frontend/
-│   ├── welcome_window.py      # Host + port configuration screen
-│   ├── login_window.py        # User login UI
-│   ├── dashboard_window.py    # Main file manager UI
-│
-├── Server/
-│   ├── server.py              # FTP server implementation
-│   ├── accounts.json          # User credentials and permissions
-│   ├── storage/               # User files are stored here
-│
-├── main.py                    # Entry point for client GUI
-└── README.md
-
 Installation
 Install Python
 Make sure you have Python 3.10 or newer installed.
