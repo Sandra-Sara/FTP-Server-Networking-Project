@@ -1,78 +1,85 @@
 import sys
 from PyQt5.QtWidgets import QApplication
 
-# Import UI windows
+# UI windows
 from frontend.welcome_window import ConfigWindow
 from frontend.login_window import LoginWindow
 from frontend.dashboard_window import DashboardWindow
 
-# Backend Client Socket
+# Backend
 from backend.client_socket import ClientSocket
+from backend.logger import Logger  # ✅ import logger
 
 
 class MainApp:
     def __init__(self):
         self.app = QApplication(sys.argv)
 
-        # Create the client socket instance (kept for whole session)
+        # Shared client socket for entire session
         self.client = ClientSocket()
 
-        # Step 1 — Open config window
+        # Shared logger for entire session
+        self.logger = Logger.instance()  # ✅ singleton logger
+
+        # STEP 1 — Open configuration window
         self.config_window = ConfigWindow()
         self.config_window.config_complete.connect(self.open_login)
         self.config_window.show()
 
-    # -------------------------------------------------------------------
-    # Step 2 — After configuration saved: connect to server → open login
-    # -------------------------------------------------------------------
+    # -----------------------------------------------------------------------
+    # STEP 2 — Configure server → Connect → Open Login Window
+    # -----------------------------------------------------------------------
     def open_login(self, config_data):
         host = config_data["host"]
         port = config_data["port"]
 
         print(f"Connecting to FTP server at {host}:{port}")
 
-        # Set server details
+        # Save host + port in ClientSocket
         self.client.set_server(host, port)
 
-        # Connect WITHOUT host/port arguments
+        # Connect using internal host/port (no args)
         if not self.client.connect():
-            print("Connection failed.")
+            print("❌ Connection failed. Check server.")
             return
 
-        print("Connected successfully to server.")
+        print("✅ Connected successfully to server.")
 
         self.config_window.close()
 
-        # Open login window (pass the connected client)
+        # Create login window (pass the connected ClientSocket)
         self.login_window = LoginWindow(self.client)
+
+        # When login succeeds → open dashboard
         self.login_window.login_success.connect(self.open_dashboard)
+
         self.login_window.show()
 
-    # -------------------------------------------------------------------
-    # Step 3 — After login, open dashboard with permissions
-    # -------------------------------------------------------------------
+    # -----------------------------------------------------------------------
+    # STEP 3 — Login Success → Open Dashboard
+    # -----------------------------------------------------------------------
     def open_dashboard(self, login_data):
-
         username = login_data["username"]
         permissions = login_data["permissions"]
 
-        print(f"User logged in: {username}")
-        print("Permissions:", permissions)
+        print(f"👤 User logged in: {username}")
+        print("🔐 Permissions:", permissions)
 
         self.login_window.close()
 
-        # DashboardWindow expects: (client_socket, username, permissions)
+        # Dashboard expects client_socket, username, permissions, logger
         self.dashboard = DashboardWindow(
             client_socket=self.client,
             username=username,
-            permissions=permissions
+            permissions=permissions,
+            logger=self.logger  # ✅ pass logger here
         )
 
         self.dashboard.show()
 
-    # -------------------------------------------------------------------
-    # Start app loop
-    # -------------------------------------------------------------------
+    # -----------------------------------------------------------------------
+    # RUN APP
+    # -----------------------------------------------------------------------
     def run(self):
         sys.exit(self.app.exec_())
 
