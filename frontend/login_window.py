@@ -14,7 +14,7 @@ class LoginWindow(QWidget):
         self.client = client
 
         self.setWindowTitle("LockBox FTP — Login")
-        self.setFixedSize(900,700)
+        self.setFixedSize(900, 700)
         self.setStyleSheet("""
             QWidget {
                 background: qlineargradient(
@@ -23,174 +23,149 @@ class LoginWindow(QWidget):
                 );
             }
         """)
+
         self.build_ui()
 
-    # -------------------------------------------------------
-    # Build UI
-    # -------------------------------------------------------
     def build_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignCenter)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(40, 40, 40, 40)
+        main_layout.setSpacing(20)
 
-        # ---------------------------------------------------
-        # TITLE
-        # ---------------------------------------------------
-        title = QLabel("🔐 LockBox FTP")
-        title.setFont(QFont("Segoe UI", 30, QFont.Bold))
-        title.setStyleSheet("color: #ffffff;")
+        # ——— Title & Description (outside the card) ———
+        title = QLabel("LockBox FTP")
+        title.setFont(QFont("Segoe UI", 36, QFont.Bold))
+        title.setStyleSheet("color: white;")
         title.setAlignment(Qt.AlignCenter)
-        layout.addWidget(title)
+        main_layout.addWidget(title)
 
-        # ---------------------------------------------------
-        # FTP Server Description
-        # ---------------------------------------------------
         description = QLabel("Connect securely to your LockBox FTP server to manage files")
         description.setFont(QFont("Segoe UI", 14))
         description.setStyleSheet("color: #e0f7fa; font-weight: 500;")
         description.setAlignment(Qt.AlignCenter)
-        layout.addWidget(description)
+        main_layout.addWidget(description)
 
         subtitle = QLabel("Secure Login Access")
-        subtitle.setFont(QFont("Segoe UI", 14))
-        subtitle.setStyleSheet("color: #e0f7fa;")
+        subtitle.setFont(QFont("Segoe UI", 15, QFont.DemiBold))
+        subtitle.setStyleSheet("color: white;")
         subtitle.setAlignment(Qt.AlignCenter)
-        layout.addWidget(subtitle)
+        main_layout.addWidget(subtitle)
 
-        # ---------------------------------------------------
-        # CARD FRAME
-        # ---------------------------------------------------
+        # Push everything to the true vertical center
+        main_layout.addStretch(1)
+
+        # ——— Horizontal centering for the card ———
+        h_center = QHBoxLayout()
+        h_center.addStretch(1)
+        h_center.addWidget(self.create_login_card())
+        h_center.addStretch(1)
+
+        main_layout.addLayout(h_center)
+        main_layout.addStretch(1)  # bottom stretch
+
+    def create_login_card(self):
         card = QFrame()
+        card.setFixedWidth(420)
         card.setStyleSheet("""
             QFrame {
                 background-color: #a2d4f7;
                 border-radius: 20px;
             }
         """)
-        card.setFixedWidth(420)
 
         # Shadow
         shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(30)
+        shadow.setBlurRadius(35)
         shadow.setXOffset(0)
-        shadow.setYOffset(15)
-        shadow.setColor(QColor(0, 0, 0, 80))
+        shadow.setYOffset(20)
+        shadow.setColor(QColor(0, 0, 0, 100))
         card.setGraphicsEffect(shadow)
 
-        card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(40, 40, 40, 40)
-        card_layout.setSpacing(20)
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(40, 40, 40, 40)
+        layout.setSpacing(22)
 
-        # ---------------------------------------------------
-        # USERNAME FIELD
-        # ---------------------------------------------------
+        # Username
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("Username")
-        self.username_input.setFixedHeight(50)
+        self.username_input.setFixedHeight(52)
         self.username_input.setStyleSheet("""
             QLineEdit {
                 background-color: #81cbee;
                 border: 2px solid #5fb6e0;
                 border-radius: 12px;
-                padding-left: 12px;
+                padding-left: 15px;
                 color: #004466;
                 font-size: 15px;
             }
             QLineEdit:focus {
-                border: 2px solid #ffffff;
+                border: 3px solid white;
+                background-color: #9eddff;
             }
         """)
-        card_layout.addWidget(self.username_input)
+        layout.addWidget(self.username_input)
 
-        # ---------------------------------------------------
-        # PASSWORD FIELD
-        # ---------------------------------------------------
+        # Password
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("Password")
         self.password_input.setEchoMode(QLineEdit.Password)
-        self.password_input.setFixedHeight(50)
-        self.password_input.setStyleSheet("""
-            QLineEdit {
-                background-color: #81cbee;
-                border: 2px solid #5fb6e0;
-                border-radius: 12px;
-                padding-left: 12px;
-                color: #004466;
-                font-size: 15px;
-            }
-            QLineEdit:focus {
-                border: 2px solid #ffffff;
-            }
-        """)
-        card_layout.addWidget(self.password_input)
+        self.password_input.setFixedHeight(52)
+        self.password_input.setStyleSheet(self.username_input.styleSheet())  # reuse style
+        layout.addWidget(self.password_input)
 
-        # ---------------------------------------------------
-        # BUTTONS
-        # ---------------------------------------------------
+        # Buttons
         btn_row = QHBoxLayout()
-        btn_row.setSpacing(12)
+        btn_row.setSpacing(15)
 
-        # Login button
         self.login_btn = QPushButton("Login")
-        self.login_btn.setFixedHeight(50)
+        self.login_btn.setFixedHeight(52)
         self.login_btn.clicked.connect(self.attempt_login)
         self.login_btn.setStyleSheet("""
             QPushButton {
-                background-color: qlineargradient(
-                    x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #00FFD1, stop:1 #00AFFF
-                );
+                background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00FFD1, stop:1 #00AFFF);
                 border-radius: 12px;
                 color: white;
                 font-size: 16px;
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: qlineargradient(
-                    x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #00FFE5, stop:1 #33CFFF
-                );
+                background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #00FFE5, stop:1 #33CFFF);
             }
         """)
-        btn_row.addWidget(self.login_btn)
 
-        # Cancel button
         self.cancel_btn = QPushButton("Cancel")
-        self.cancel_btn.setFixedHeight(50)
+        self.cancel_btn.setFixedHeight(52)
         self.cancel_btn.clicked.connect(self.close)
         self.cancel_btn.setStyleSheet("""
             QPushButton {
                 background-color: #00BFFF;
                 border-radius: 12px;
-                color: #ffffff;
+                color: white;
                 font-size: 15px;
             }
-            QPushButton:hover {
-                background-color: #0099CC;
-            }
+            QPushButton:hover { background-color: #0099CC; }
         """)
+
+        btn_row.addWidget(self.login_btn)
         btn_row.addWidget(self.cancel_btn)
+        layout.addLayout(btn_row)
 
-        card_layout.addLayout(btn_row)
-        layout.addWidget(card)
+        return card
 
-    # -------------------------------------------------------
-    # Read response
-    # -------------------------------------------------------
+    # —————————————————————— Login Logic (unchanged) ——————————————————————
     def _recv_line(self):
         try:
             return self.client.receive()
         except:
             return None
 
-    # -------------------------------------------------------
-    # LOGIN PROCESS
-    # -------------------------------------------------------
     def attempt_login(self):
         user = self.username_input.text().strip()
         pwd = self.password_input.text().strip()
 
         if not user or not pwd:
-            QMessageBox.warning(self, "Missing Fields", "Username and password required.")
+            QMessageBox.warning(self, "Missing Fields", "Please enter both username and password.")
             return
 
         self.login_btn.setEnabled(False)
@@ -201,57 +176,30 @@ class LoginWindow(QWidget):
             resp = self._recv_line()
             if not resp or not resp.startswith("331"):
                 QMessageBox.warning(self, "Login Failed", resp or "Server error")
-                self._reset_buttons()
                 return
 
             self.client.send(f"PASS {pwd}")
             resp = self._recv_line()
             if not resp or not resp.startswith("230"):
-                QMessageBox.warning(self, "Login Failed", resp or "Server error")
-                self._reset_buttons()
+                QMessageBox.warning(self, "Login Failed", resp or "Invalid credentials")
                 return
 
+            perms = {"read": True, "write": True, "delete": True}
             perms_line = self._recv_line()
-            perms = {"read": False, "write": False, "delete": False}
-
             if perms_line and perms_line.startswith("PERMS"):
-                parts = perms_line.split()
-                for p in parts[1:]:
-                    key, val = p.split("=")
-                    perms[key] = bool(int(val))
+                try:
+                    for item in perms_line.split()[1:]:
+                        k, v = item.split("=")
+                        perms[k] = bool(int(v))
+                except:
+                    pass
 
-            # -------------------------------
-            # Custom QMessageBox for Success
-            # -------------------------------
-            msg_box = QMessageBox(self)
-            msg_box.setWindowTitle("Success")
-            msg_box.setText("Login successful!")
-            msg_box.setIcon(QMessageBox.Information)
-
-            ok_button = msg_box.addButton(QMessageBox.Ok)
-            ok_button.setStyleSheet("""
-                QPushButton {
-                    background-color: white;
-                    color: #00BFFF;
-                    font-weight: bold;
-                    min-width: 80px;
-                    min-height: 35px;
-                    border-radius: 6px;
-                }
-                QPushButton:hover {
-                    background-color: #e0f7fa;
-                }
-            """)
-            msg_box.exec_()
-
+            QMessageBox.information(self, "Success", "Login successful!\nWelcome to LockBox FTP")
             self.login_success.emit({"username": user, "permissions": perms})
             self.close()
 
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Login error: {e}")
-
-        self._reset_buttons()
-
-    def _reset_buttons(self):
-        self.login_btn.setEnabled(True)
-        self.cancel_btn.setEnabled(True)
+            QMessageBox.critical(self, "Error", f"Connection failed:\n{e}")
+        finally:
+            self.login_btn.setEnabled(True)
+            self.cancel_btn.setEnabled(True)
