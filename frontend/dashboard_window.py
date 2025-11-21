@@ -1,3 +1,4 @@
+# frontend/dashboard_window.py
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QFileDialog,
     QListWidget, QHBoxLayout, QMessageBox, QFrame
@@ -6,14 +7,17 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 import os
 
+from frontend.log_window import LogWindow   # ✅ Log window
+from backend.logger import Logger            # ✅ Logger
 
 class DashboardWindow(QWidget):
-    def __init__(self, client_socket, username, permissions):
+    def __init__(self, client_socket, username, permissions, logger):
         super().__init__()
 
         self.client = client_socket
         self.username = username
         self.permissions = permissions
+        self.logger = logger   # ✅ store logger instance
 
         self.setWindowTitle("LockBox FTP Dashboard")
         self.setGeometry(250, 80, 950, 620)
@@ -102,12 +106,34 @@ class DashboardWindow(QWidget):
         self.btn_delete.clicked.connect(self.delete_file)
         btn_row.addWidget(self.btn_delete)
 
+        self.btn_logs = QPushButton("📜 View Logs")
+        self.btn_logs.clicked.connect(self.open_logs)
+        btn_row.addWidget(self.btn_logs)
+
         main.addLayout(btn_row)
 
-        # LOGOUT
         logout_btn = QPushButton("🚪 Logout")
-        logout_btn.clicked.connect(self.close)
+        logout_btn.clicked.connect(self.logout)
         main.addWidget(logout_btn)
+
+        self.log("Logged in successfully.")  # ✅ fixed logger usage
+
+    # -----------------------------------------------------
+    def log(self, text):
+        """Send log to shared logger"""
+        self.logger.log(f"[User: {self.username}] {text}")  # ✅ use .log()
+
+    # -----------------------------------------------------
+    def open_logs(self):
+        self.log("Opened Logs Window.")
+        # ✅ Pass logger to LogWindow
+        self.log_window = LogWindow(logger=self.logger)
+        self.log_window.show()
+
+    # -----------------------------------------------------
+    def logout(self):
+        self.log("User logged out.")
+        self.close()
 
     # -----------------------------------------------------
     # LIST FILES
@@ -118,15 +144,19 @@ class DashboardWindow(QWidget):
             self.client.send("LIST")
             lines = self.client.receive_multiline().split("\n")
 
+            count = 0
             for line in lines:
                 if line.startswith("FILE") or line.startswith("DIR"):
-                    # Format: "FILE 123 myfile.txt"
                     parts = line.split(" ", 2)
                     if len(parts) == 3:
                         _, _, name = parts
                         self.file_list.addItem(name)
+                        count += 1
+
+            self.log(f"Listed files ({count} items).")
 
         except Exception as e:
+            self.log(f"Error listing files: {str(e)}")
             QMessageBox.critical(self, "Error", str(e))
 
     # -----------------------------------------------------
@@ -135,10 +165,10 @@ class DashboardWindow(QWidget):
     def upload_file(self):
         if not self.permissions["write"]:
             QMessageBox.warning(self, "Denied", "You do not have write permissions.")
+            self.log("Upload blocked (no permission).")
             return
 
         path, _ = QFileDialog.getOpenFileName(self, "Select a file to upload")
-
         if not path:
             return
 
@@ -150,19 +180,20 @@ class DashboardWindow(QWidget):
             response = self.client.receive()
 
             if not response.startswith("150"):
+                self.log(f"Upload failed: {response}")
                 QMessageBox.warning(self, "Error", response)
                 return
 
-            # Send file bytes
             with open(path, "rb") as f:
                 self.client.send_bytes(f.read())
 
             done = self.client.receive()
             QMessageBox.information(self, "Upload Complete", done)
-
+            self.log(f"Uploaded file: {filename} ({size} bytes)")
             self.list_files()
 
         except Exception as e:
+            self.log(f"Upload Error: {str(e)}")
             QMessageBox.critical(self, "Upload Error", str(e))
 
     # -----------------------------------------------------
@@ -171,6 +202,7 @@ class DashboardWindow(QWidget):
     def download_file(self):
         if not self.permissions["read"]:
             QMessageBox.warning(self, "Denied", "You do not have read permissions.")
+            self.log("Download blocked (no permission).")
             return
 
         item = self.file_list.currentItem()
@@ -185,12 +217,11 @@ class DashboardWindow(QWidget):
             response = self.client.receive()
 
             if not response.startswith("150"):
+                self.log(f"Download failed: {response}")
                 QMessageBox.warning(self, "Error", response)
                 return
 
-            # Parse size
             size = int(response.split()[1])
-
             save_path, _ = QFileDialog.getSaveFileName(self, "Save File As", filename)
             if not save_path:
                 return
@@ -202,8 +233,10 @@ class DashboardWindow(QWidget):
 
             done = self.client.receive()
             QMessageBox.information(self, "Download Complete", done)
+            self.log(f"Downloaded file: {filename} ({size} bytes)")
 
         except Exception as e:
+            self.log(f"Download Error: {str(e)}")
             QMessageBox.critical(self, "Download Error", str(e))
 
     # -----------------------------------------------------
@@ -212,6 +245,7 @@ class DashboardWindow(QWidget):
     def delete_file(self):
         if not self.permissions["delete"]:
             QMessageBox.warning(self, "Denied", "You do not have delete permissions.")
+            self.log("Delete blocked (no permission).")
             return
 
         item = self.file_list.currentItem()
@@ -234,7 +268,10 @@ class DashboardWindow(QWidget):
             self.client.send(f"DELE {filename}")
             response = self.client.receive()
             QMessageBox.information(self, "Deleted", response)
+
+            self.log(f"Deleted file: {filename}")
             self.list_files()
 
         except Exception as e:
+            self.log(f"Delete Error: {str(e)}")
             QMessageBox.critical(self, "Delete Error", str(e))

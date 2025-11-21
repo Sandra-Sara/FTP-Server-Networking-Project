@@ -13,7 +13,7 @@ class ConfigWindow(QWidget):
         super().__init__()
 
         self.setWindowTitle("LockBox FTP Server - Configuration")
-        self.setGeometry(350, 100, 850, 620)
+        self.setGeometry(350, 100,900,700)
 
         # ---------------- GLOBAL STYLE ----------------
         self.setStyleSheet("""
